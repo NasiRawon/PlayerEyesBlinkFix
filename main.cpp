@@ -17,9 +17,9 @@
 
 IDebugLog				gLog;
 PluginHandle			g_pluginHandle = kPluginHandle_Invalid;
-void					* g_moduleHandle = nullptr;
+void* g_moduleHandle = nullptr;
 
-uintptr_t g_jumpAddr = 0; 
+uintptr_t g_jumpAddr = 0;
 uintptr_t g_debugAddr = 0;
 uintptr_t g_playerAddr = 0;
 
@@ -32,21 +32,23 @@ bool g_run = false;
 void MainGetAddresses()
 {
 	const std::array<BYTE, 7> jumpPattern = { 0x0F, 0xB6, 0x91, 0xDD, 0x0B, 0x00, 0x00 };
-	const std::array<BYTE, 7> debugPattern = { 0x45, 0x33, 0xE4, 0x42, 0x8B, 0x04, 0x10 };
+	const std::array<BYTE, 7> debugPattern = { 0xF6, 0x86, 0xD9, 0x0B, 0x00, 0x00, 0x10 };
 	const std::array<BYTE, 8> pattern = { 0x8B, 0x40, 0x10, 0xC1, 0xE8, 0x17, 0xA8, 0x01 };
 
-	g_jumpAddr = (uintptr_t)scan_memory(jumpPattern, 0x2A, false);
-	g_debugAddr = (uintptr_t)scan_memory(debugPattern, 0x99, false);
-	g_playerAddr = (uintptr_t)scan_memory_data(pattern, 0x23, true, 0x3, 0x7);
+	//g_jumpAddr = (uintptr_t)scan_memory(jumpPattern, 0x2A, false); //SE
+
+	g_jumpAddr = (uintptr_t)scan_memory(jumpPattern, 0x29, false); // AE
+	g_debugAddr = (uintptr_t)scan_memory(debugPattern, 0x1E, true, 0x1, 0x5);
+	g_playerAddr = (uintptr_t)scan_memory(pattern, 0x23, true, 0x3, 0x7);
 }
 
-void UpdateExpression(PlayerCharacter * player, float value)
+void UpdateExpression(PlayerCharacter* player, float value)
 {
-	BSFaceGenAnimationData * faceAnimData = nullptr;
+	BSFaceGenAnimationData* faceAnimData = nullptr;
 	faceAnimData = player->GetFaceGenAnimationData();
 	if (faceAnimData)
 	{
-		BSFaceGenKeyframeMultiple * keyframe = nullptr;
+		BSFaceGenKeyframeMultiple* keyframe = nullptr;
 		keyframe = &faceAnimData->keyFrames[7];
 		if (keyframe && keyframe->count == 17)
 		{
@@ -58,7 +60,7 @@ void UpdateExpression(PlayerCharacter * player, float value)
 
 void PlayerBlink(UINT uID)
 {
-	PlayerCharacter * player = *(PlayerCharacter**)g_playerAddr;
+	PlayerCharacter* player = *(PlayerCharacter**)g_playerAddr;
 	if (player && player->loadedState)
 	{
 		INT32 timer = g_timer;
@@ -123,8 +125,8 @@ bool Stop()
 		}
 		timeEndPeriod(g_resolution);
 	}
-		
-	PlayerCharacter * player = *(PlayerCharacter**)g_playerAddr;
+
+	PlayerCharacter* player = *(PlayerCharacter**)g_playerAddr;
 	if (player && player->loadedState)
 		UpdateExpression(player, 0);
 
@@ -133,7 +135,7 @@ bool Stop()
 
 void JumpProcessButton_Hook(ButtonEvent* evn)
 {
-	typedef void(*DebugNotification_t)(const char *, bool, bool);
+	typedef void(*DebugNotification_t)(const char*, bool, bool);
 	const DebugNotification_t DebugNotification = (DebugNotification_t)g_debugAddr;
 
 	static bool bProcessLongTap = false;
@@ -153,7 +155,7 @@ void JumpProcessButton_Hook(ButtonEvent* evn)
 			if (id != 0)
 			{
 				state = Stop();
-				DebugNotification((state? "PlayerBlink has been disabled.":"Error"), false, true);
+				DebugNotification((state ? "PlayerBlink has been disabled." : "Error"), false, true);
 			}
 			else
 			{
@@ -170,7 +172,7 @@ void JumpProcessButton_Hook(ButtonEvent* evn)
 extern "C"
 {
 
-	bool SKSEPlugin_Query(const SKSEInterface * skse, PluginInfo * info)
+	bool SKSEPlugin_Query(const SKSEInterface* skse, PluginInfo* info)
 	{
 
 		gLog.OpenRelative(CSIDL_MYDOCUMENTS, "\\My Games\\Skyrim Special Edition\\SKSE\\PlayerBlink.log");
@@ -202,14 +204,14 @@ extern "C"
 		return true;
 	}
 
-	bool SKSEPlugin_Load(const SKSEInterface * skse)
+	bool SKSEPlugin_Load(const SKSEInterface* skse)
 	{
 		_MESSAGE("Load");
 
 		MainGetAddresses();
 
 		struct InstallHookJumpProcessButton_Code : Xbyak::CodeGenerator {
-			InstallHookJumpProcessButton_Code(void * buf, UInt64 funcAddr) : Xbyak::CodeGenerator(4096, buf)
+			InstallHookJumpProcessButton_Code(void* buf, UInt64 funcAddr) : Xbyak::CodeGenerator(4096, buf)
 			{
 				Xbyak::Label retn1Label;
 				Xbyak::Label retn2Label;
@@ -227,8 +229,11 @@ extern "C"
 				pop(rax);
 				add(rsp, 0x20);
 
+				// overwritten codes
+				// movss xmm1,dword ptr ds:[rbx+28] 
+				movss(xmm1, dword[rbx + 0x28]); // AE only
 				xorps(xmm0, xmm0);
-				test(al, al); // overwritten code
+				test(al, al);
 				je(jumpLabel);
 				jmp(ptr[rip + retn1Label]);
 
@@ -242,11 +247,12 @@ extern "C"
 				dq(g_jumpAddr + 0x6);
 
 				L(retn2Label);
-				dq(g_jumpAddr + 0x8C);
+				dq(g_jumpAddr + 0x86); // AE
+				//dq(g_jumpAddr + 0x8C); // SE
 			}
 		};
 
-		void * codeBuf = g_localTrampoline.StartAlloc();
+		void* codeBuf = g_localTrampoline.StartAlloc();
 		InstallHookJumpProcessButton_Code code(codeBuf, GetFnAddr(JumpProcessButton_Hook));
 		g_localTrampoline.EndAlloc(code.getCurr());
 
