@@ -31,8 +31,10 @@ bool g_run = false;
 
 void MainGetAddresses()
 {
-	const std::array<BYTE, 7> jumpPattern = { 0x0F, 0xB6, 0x91, 0xDD, 0x0B, 0x00, 0x00 };
-	const std::array<BYTE, 7> debugPattern = { 0xF6, 0x86, 0xD9, 0x0B, 0x00, 0x00, 0x10 };
+	//const std::array<BYTE, 7> jumpPattern = { 0x0F, 0xB6, 0x91, 0xDD, 0x0B, 0x00, 0x00 };
+	//const std::array<BYTE, 7> debugPattern = { 0xF6, 0x86, 0xD9, 0x0B, 0x00, 0x00, 0x10 };
+	const std::array<BYTE, 7> jumpPattern = { 0x0F, 0xB6, 0x91, 0xE5, 0x0B, 0x00, 0x00 };
+	const std::array<BYTE, 7> debugPattern = { 0xF6, 0x86, 0xE1, 0x0B, 0x00, 0x00, 0x10 };
 	const std::array<BYTE, 8> pattern = { 0x8B, 0x40, 0x10, 0xC1, 0xE8, 0x17, 0xA8, 0x01 };
 
 	//g_jumpAddr = (uintptr_t)scan_memory(jumpPattern, 0x2A, false); //SE
@@ -172,14 +174,26 @@ void JumpProcessButton_Hook(ButtonEvent* evn)
 extern "C"
 {
 
-	bool SKSEPlugin_Query(const SKSEInterface* skse, PluginInfo* info)
+	__declspec(dllexport) SKSEPluginVersionData SKSEPlugin_Version =
 	{
+		SKSEPluginVersionData::kVersion,
 
+		1,
+		"Player Eyes Blink Fix",
+
+		"NasGorTelorCeplok",
+		"",
+
+		0,
+		2,	// version independent
+		{ 0 },
+
+		0,	// works with any version of the script extender. you probably do not need to put anything here
+	};
+
+	bool SKSEPlugin_Load(const SKSEInterface* skse)
+	{
 		gLog.OpenRelative(CSIDL_MYDOCUMENTS, "\\My Games\\Skyrim Special Edition\\SKSE\\PlayerBlink.log");
-
-		info->infoVersion = PluginInfo::kInfoVersion;
-		info->name = "Player Blink plugin";
-		info->version = 1;
 
 		g_pluginHandle = skse->GetPluginHandle();
 
@@ -201,11 +215,6 @@ extern "C"
 			return false;
 		}
 
-		return true;
-	}
-
-	bool SKSEPlugin_Load(const SKSEInterface* skse)
-	{
 		_MESSAGE("Load");
 
 		MainGetAddresses();

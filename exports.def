@@ -1,4 +1,3 @@
 LIBRARY	"PlayerEyesBlinkFix"
 EXPORTS
-SKSEPlugin_Query
 SKSEPlugin_Load
